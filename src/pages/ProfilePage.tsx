@@ -10,6 +10,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { User, Settings, Package, MessageSquare, ShoppingBag } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
+import type { Json } from '@/integrations/supabase/types';
+
+interface AddressType {
+  street?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+}
 
 interface Profile {
   id: string;
@@ -17,12 +25,7 @@ interface Profile {
   email: string | null;
   phone: string | null;
   is_seller: boolean;
-  address: {
-    street?: string;
-    city?: string;
-    state?: string;
-    zip?: string;
-  } | null;
+  address: AddressType | null;
 }
 
 const ProfilePage = () => {
@@ -32,7 +35,7 @@ const ProfilePage = () => {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [isSeller, setIsSeller] = useState(false);
-  const [address, setAddress] = useState({
+  const [address, setAddress] = useState<AddressType>({
     street: '',
     city: '',
     state: '',
@@ -45,6 +48,20 @@ const ProfilePage = () => {
       fetchProfile();
     }
   }, [user]);
+
+  const parseAddress = (addressJson: Json | null): AddressType => {
+    if (!addressJson || typeof addressJson !== 'object' || Array.isArray(addressJson)) {
+      return { street: '', city: '', state: '', zip: '' };
+    }
+    
+    const addr = addressJson as Record<string, unknown>;
+    return {
+      street: typeof addr.street === 'string' ? addr.street : '',
+      city: typeof addr.city === 'string' ? addr.city : '',
+      state: typeof addr.state === 'string' ? addr.state : '',
+      zip: typeof addr.zip === 'string' ? addr.zip : '',
+    };
+  };
 
   const fetchProfile = async () => {
     if (!user) return;
@@ -60,11 +77,21 @@ const ProfilePage = () => {
       console.error('Error fetching profile:', error);
       toast.error('Failed to load profile');
     } else if (data) {
-      setProfile(data);
+      const parsedAddress = parseAddress(data.address);
+      const profileData: Profile = {
+        id: data.id,
+        full_name: data.full_name,
+        email: data.email,
+        phone: data.phone,
+        is_seller: data.is_seller || false,
+        address: parsedAddress,
+      };
+      
+      setProfile(profileData);
       setFullName(data.full_name || '');
       setPhone(data.phone || '');
       setIsSeller(data.is_seller || false);
-      setAddress(data.address || { street: '', city: '', state: '', zip: '' });
+      setAddress(parsedAddress);
     }
     setLoading(false);
   };
@@ -79,7 +106,7 @@ const ProfilePage = () => {
       email: user.email,
       phone: phone,
       is_seller: isSeller,
-      address: address,
+      address: address as Json,
     };
 
     const { error } = await supabase
