@@ -55,6 +55,7 @@ const ProductPage = () => {
       console.error('Error fetching product:', error);
       toast.error('Failed to load product');
     } else {
+      console.log('Fetched product:', data);
       setProduct(data);
       setProposedPrice(data.price.toString());
     }
@@ -72,12 +73,19 @@ const ProductPage = () => {
       return;
     }
 
+    if (!product.seller_id) {
+      toast.error('This product does not have a seller assigned. Please contact support.');
+      return;
+    }
+
     if (user.id === product.seller_id) {
       toast.error("You can't contact yourself!");
       return;
     }
 
     try {
+      console.log('Creating conversation with seller_id:', product.seller_id);
+      
       // Check if conversation already exists
       const { data: existingConv } = await supabase
         .from('conversations')
@@ -122,6 +130,11 @@ const ProductPage = () => {
       return;
     }
 
+    if (!product.seller_id) {
+      toast.error('This product does not have a seller assigned. Please contact support.');
+      return;
+    }
+
     if (!proposedPrice || parseFloat(proposedPrice) <= 0) {
       toast.error('Please enter a valid price');
       return;
@@ -130,6 +143,8 @@ const ProductPage = () => {
     setSubmittingNegotiation(true);
 
     try {
+      console.log('Creating negotiation with seller_id:', product.seller_id);
+      
       const { error } = await supabase
         .from('negotiations')
         .insert({
@@ -283,7 +298,7 @@ const ProductPage = () => {
                         variant="outline"
                         onClick={handleContactSeller}
                         size="lg"
-                        disabled={!user}
+                        disabled={!user || !product.seller_id}
                       >
                         <MessageSquare className="h-5 w-5 mr-2" />
                         Contact Seller
@@ -292,7 +307,7 @@ const ProductPage = () => {
                         variant="outline"
                         onClick={() => setShowNegotiation(!showNegotiation)}
                         size="lg"
-                        disabled={!user}
+                        disabled={!user || !product.seller_id}
                       >
                         <DollarSign className="h-5 w-5 mr-2" />
                         Negotiate Price
@@ -308,12 +323,18 @@ const ProductPage = () => {
                       to contact seller and negotiate prices
                     </p>
                   )}
+
+                  {user && !product.seller_id && (
+                    <p className="text-sm text-orange-600">
+                      This product doesn't have a seller assigned. Contact and negotiation features are disabled.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
 
             {/* Negotiation Form */}
-            {showNegotiation && user && (
+            {showNegotiation && user && product.seller_id && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
