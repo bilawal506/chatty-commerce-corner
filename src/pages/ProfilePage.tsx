@@ -1,157 +1,106 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { User, Package, MessageSquare, Settings } from 'lucide-react';
+import { User, Settings, Package, MessageSquare, ShoppingBag } from 'lucide-react';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
 interface Profile {
   id: string;
-  full_name: string;
-  email: string;
-  phone: string;
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
   is_seller: boolean;
-}
-
-interface Order {
-  id: string;
-  total_amount: number;
-  status: string;
-  created_at: string;
-  order_items: Array<{
-    product: {
-      name: string;
-      image_url: string;
-    };
-    quantity: number;
-    price: number;
-  }>;
-}
-
-interface Negotiation {
-  id: string;
-  original_price: number;
-  proposed_price: number;
-  status: string;
-  message: string;
-  created_at: string;
-  product: {
-    name: string;
-    image_url: string;
-  };
+  address: {
+    street?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+  } | null;
 }
 
 const ProfilePage = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [negotiations, setNegotiations] = useState<Negotiation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingProfile, setEditingProfile] = useState(false);
-  const { user } = useAuth();
-  const navigate = useNavigate();
+  const [saving, setSaving] = useState(false);
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [isSeller, setIsSeller] = useState(false);
+  const [address, setAddress] = useState({
+    street: '',
+    city: '',
+    state: '',
+    zip: '',
+  });
+  const { user, signOut } = useAuth();
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-      return;
+    if (user) {
+      fetchProfile();
     }
-    fetchProfile();
-    fetchOrders();
-    fetchNegotiations();
-  }, [user, navigate]);
+  }, [user]);
 
   const fetchProfile = async () => {
     if (!user) return;
 
+    setLoading(true);
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('user_id', user.id)
       .single();
 
-    if (error) {
+    if (error && error.code !== 'PGRST116') {
       console.error('Error fetching profile:', error);
-    } else {
+      toast.error('Failed to load profile');
+    } else if (data) {
       setProfile(data);
-    }
-  };
-
-  const fetchOrders = async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        order_items(
-          quantity,
-          price,
-          product:products(name, image_url)
-        )
-      `)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching orders:', error);
-    } else {
-      setOrders(data || []);
+      setFullName(data.full_name || '');
+      setPhone(data.phone || '');
+      setIsSeller(data.is_seller || false);
+      setAddress(data.address || { street: '', city: '', state: '', zip: '' });
     }
     setLoading(false);
   };
 
-  const fetchNegotiations = async () => {
+  const handleSave = async () => {
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from('negotiations')
-      .select(`
-        *,
-        product:products(name, image_url)
-      `)
-      .eq('buyer_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching negotiations:', error);
-    } else {
-      setNegotiations(data || []);
-    }
-  };
-
-  const updateProfile = async () => {
-    if (!user || !profile) return;
+    setSaving(true);
+    const profileData = {
+      user_id: user.id,
+      full_name: fullName,
+      email: user.email,
+      phone: phone,
+      is_seller: isSeller,
+      address: address,
+    };
 
     const { error } = await supabase
       .from('profiles')
-      .update({
-        full_name: profile.full_name,
-        email: profile.email,
-        phone: profile.phone,
-      })
-      .eq('user_id', user.id);
+      .upsert(profileData);
 
     if (error) {
-      console.error('Error updating profile:', error);
-      toast.error('Failed to update profile');
+      console.error('Error saving profile:', error);
+      toast.error('Failed to save profile');
     } else {
-      toast.success('Profile updated successfully');
-      setEditingProfile(false);
+      toast.success('Profile updated successfully!');
+      fetchProfile();
     }
+    setSaving(false);
   };
 
-  if (!user) {
-    return null;
-  }
+  const handleSignOut = async () => {
+    await signOut();
+  };
 
-  if (loading || !profile) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -167,228 +116,167 @@ const ProfilePage = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">My Account</h1>
-
-        <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="profile" className="flex items-center space-x-2">
-              <User className="h-4 w-4" />
-              <span>Profile</span>
-            </TabsTrigger>
-            <TabsTrigger value="orders" className="flex items-center space-x-2">
-              <Package className="h-4 w-4" />
-              <span>Orders</span>
-            </TabsTrigger>
-            <TabsTrigger value="negotiations" className="flex items-center space-x-2">
-              <MessageSquare className="h-4 w-4" />
-              <span>Negotiations</span>
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center space-x-2">
-              <Settings className="h-4 w-4" />
-              <span>Settings</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="profile">
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">My Profile</h1>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Navigation Cards */}
+          <div className="space-y-4">
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>Profile Information</CardTitle>
-                  <Button
-                    variant="outline"
-                    onClick={() => setEditingProfile(!editingProfile)}
-                  >
-                    {editingProfile ? 'Cancel' : 'Edit'}
-                  </Button>
-                </div>
+                <CardTitle className="flex items-center space-x-2">
+                  <User className="h-5 w-5" />
+                  <span>Quick Actions</span>
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="fullName">Full Name</Label>
-                  <Input
-                    id="fullName"
-                    value={profile.full_name || ''}
-                    onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
-                    disabled={!editingProfile}
-                  />
+              <CardContent className="space-y-3">
+                <Button asChild variant="outline" className="w-full justify-start">
+                  <Link to="/chats">
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    My Chats
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full justify-start">
+                  <Link to="/cart">
+                    <ShoppingBag className="h-4 w-4 mr-2" />
+                    My Cart
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full justify-start">
+                  <Link to="/">
+                    <Package className="h-4 w-4 mr-2" />
+                    Browse Products
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Settings className="h-5 w-5" />
+                  <span>Account</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Button 
+                  onClick={handleSignOut}
+                  variant="outline" 
+                  className="w-full"
+                >
+                  Sign Out
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Profile Information */}
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Profile Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName">Full Name</Label>
+                    <Input
+                      id="fullName"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Enter your full name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      value={user?.email || ''}
+                      disabled
+                      className="bg-gray-100"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    value={profile.email || ''}
-                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                    disabled={!editingProfile}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="phone">Phone</Label>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
                   <Input
                     id="phone"
-                    value={profile.phone || ''}
-                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                    disabled={!editingProfile}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="Enter your phone number"
                   />
                 </div>
+
                 <div className="flex items-center space-x-2">
-                  <Label>Account Type:</Label>
-                  <Badge variant={profile.is_seller ? 'default' : 'secondary'}>
-                    {profile.is_seller ? 'Seller' : 'Buyer'}
-                  </Badge>
+                  <Switch
+                    id="seller-mode"
+                    checked={isSeller}
+                    onCheckedChange={setIsSeller}
+                  />
+                  <Label htmlFor="seller-mode">
+                    {isSeller ? 'Seller Account' : 'Buyer Account'}
+                  </Label>
                 </div>
-                {editingProfile && (
-                  <Button onClick={updateProfile}>
-                    Save Changes
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                <p className="text-sm text-gray-600">
+                  {isSeller 
+                    ? 'You can sell products and receive messages from buyers.'
+                    : 'Switch to seller mode to start selling your products.'
+                  }
+                </p>
 
-          <TabsContent value="orders">
-            <Card>
-              <CardHeader>
-                <CardTitle>Order History</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {orders.length === 0 ? (
-                  <p className="text-gray-600 text-center py-8">No orders found</p>
-                ) : (
-                  <div className="space-y-4">
-                    {orders.map((order) => (
-                      <Card key={order.id} className="border">
-                        <CardContent className="p-4">
-                          <div className="flex justify-between items-start mb-3">
-                            <div>
-                              <p className="font-semibold">Order #{order.id.slice(0, 8)}</p>
-                              <p className="text-sm text-gray-600">
-                                {new Date(order.created_at).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <Badge variant={
-                                order.status === 'completed' ? 'default' :
-                                order.status === 'pending' ? 'secondary' : 'destructive'
-                              }>
-                                {order.status}
-                              </Badge>
-                              <p className="font-bold mt-1">${order.total_amount.toFixed(2)}</p>
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            {order.order_items.map((item, index) => (
-                              <div key={index} className="flex items-center space-x-3">
-                                <img
-                                  src={item.product.image_url || '/placeholder-product.jpg'}
-                                  alt={item.product.name}
-                                  className="w-12 h-12 object-cover rounded"
-                                />
-                                <div className="flex-1">
-                                  <p className="font-medium">{item.product.name}</p>
-                                  <p className="text-sm text-gray-600">
-                                    Qty: {item.quantity} × ${item.price}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Address Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="street">Street Address</Label>
+                      <Input
+                        id="street"
+                        value={address.street}
+                        onChange={(e) => setAddress({ ...address, street: e.target.value })}
+                        placeholder="Enter street address"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City</Label>
+                      <Input
+                        id="city"
+                        value={address.city}
+                        onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                        placeholder="Enter city"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="state">State</Label>
+                      <Input
+                        id="state"
+                        value={address.state}
+                        onChange={(e) => setAddress({ ...address, state: e.target.value })}
+                        placeholder="Enter state"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="zip">ZIP Code</Label>
+                      <Input
+                        id="zip"
+                        value={address.zip}
+                        onChange={(e) => setAddress({ ...address, zip: e.target.value })}
+                        placeholder="Enter ZIP code"
+                      />
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="negotiations">
-            <Card>
-              <CardHeader>
-                <CardTitle>Price Negotiations</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {negotiations.length === 0 ? (
-                  <p className="text-gray-600 text-center py-8">No negotiations found</p>
-                ) : (
-                  <div className="space-y-4">
-                    {negotiations.map((negotiation) => (
-                      <Card key={negotiation.id} className="border">
-                        <CardContent className="p-4">
-                          <div className="flex items-start space-x-4">
-                            <img
-                              src={negotiation.product.image_url || '/placeholder-product.jpg'}
-                              alt={negotiation.product.name}
-                              className="w-16 h-16 object-cover rounded"
-                            />
-                            <div className="flex-1">
-                              <h4 className="font-semibold">{negotiation.product.name}</h4>
-                              <div className="flex items-center space-x-4 mt-2">
-                                <div>
-                                  <p className="text-sm text-gray-600">Original Price</p>
-                                  <p className="font-bold">${negotiation.original_price}</p>
-                                </div>
-                                <div>
-                                  <p className="text-sm text-gray-600">Your Offer</p>
-                                  <p className="font-bold text-blue-600">${negotiation.proposed_price}</p>
-                                </div>
-                                <Badge variant={
-                                  negotiation.status === 'accepted' ? 'default' :
-                                  negotiation.status === 'pending' ? 'secondary' :
-                                  negotiation.status === 'rejected' ? 'destructive' : 'outline'
-                                }>
-                                  {negotiation.status}
-                                </Badge>
-                              </div>
-                              {negotiation.message && (
-                                <p className="text-sm text-gray-600 mt-2">
-                                  Message: {negotiation.message}
-                                </p>
-                              )}
-                              <p className="text-xs text-gray-500 mt-2">
-                                {new Date(negotiation.created_at).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="settings">
-            <Card>
-              <CardHeader>
-                <CardTitle>Account Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="border rounded-lg p-4">
-                  <h4 className="font-semibold mb-2">Become a Seller</h4>
-                  <p className="text-sm text-gray-600 mb-3">
-                    Upgrade your account to start selling products on our platform.
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    disabled={profile.is_seller}
-                  >
-                    {profile.is_seller ? 'Already a Seller' : 'Become a Seller'}
-                  </Button>
                 </div>
-                <div className="border rounded-lg p-4">
-                  <h4 className="font-semibold mb-2">Email Preferences</h4>
-                  <p className="text-sm text-gray-600 mb-3">
-                    Manage your email notification preferences.
-                  </p>
-                  <Button variant="outline">
-                    Manage Preferences
-                  </Button>
-                </div>
+
+                <Button 
+                  onClick={handleSave} 
+                  disabled={saving}
+                  className="w-full"
+                >
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </Button>
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
       </div>
     </div>
   );

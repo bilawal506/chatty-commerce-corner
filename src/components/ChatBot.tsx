@@ -91,8 +91,16 @@ const ChatBot = () => {
     setMessages(prev => [...prev, userMsg]);
 
     try {
-      // Simulate AI response (replace with actual AI integration)
-      const aiResponse = await simulateAIResponse(userMessage);
+      // Call Gemini API through Edge Function
+      const { data, error } = await supabase.functions.invoke('gemini-chat', {
+        body: { message: userMessage }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      const aiResponse = data.response;
       
       // Add AI response to chat
       const aiMsg: Message = {
@@ -115,38 +123,18 @@ const ChatBot = () => {
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send message');
+      
+      // Add error message
+      const errorMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        message: "I'm sorry, I'm having trouble connecting right now. Please try again later.",
+        created_at: new Date().toISOString(),
+        isUser: false,
+      };
+      setMessages(prev => [...prev, errorMsg]);
     } finally {
       setLoading(false);
     }
-  };
-
-  const simulateAIResponse = async (message: string): Promise<string> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    const lowerMessage = message.toLowerCase();
-    
-    if (lowerMessage.includes('product') || lowerMessage.includes('item')) {
-      return "I can help you find products! You can browse our categories like Electronics, Clothing, Home & Garden, Books, and Sports. What type of product are you looking for?";
-    }
-    
-    if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('negotiate')) {
-      return "You can negotiate prices with sellers using our negotiation feature! Just visit any product page and click the 'Negotiate Price' button to start a conversation with the seller.";
-    }
-    
-    if (lowerMessage.includes('shipping') || lowerMessage.includes('delivery')) {
-      return "We offer various shipping options depending on the seller. Standard shipping is usually free for orders over $50, and express shipping is available for faster delivery.";
-    }
-    
-    if (lowerMessage.includes('return') || lowerMessage.includes('refund')) {
-      return "Most items can be returned within 30 days of purchase. Check the product page for specific return policies, as they may vary by seller.";
-    }
-    
-    if (lowerMessage.includes('account') || lowerMessage.includes('profile')) {
-      return "You can manage your account by clicking on your profile icon in the top navigation. There you can update your information, view orders, and manage your seller status.";
-    }
-    
-    return "Hello! I'm your AI shopping assistant. I can help you with product recommendations, price negotiations, shipping information, returns, and general questions about our store. What would you like to know?";
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {

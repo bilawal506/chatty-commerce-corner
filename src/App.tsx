@@ -12,6 +12,7 @@ import CartPage from "./pages/CartPage";
 import AuthPage from "./pages/AuthPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import ProfilePage from "./pages/ProfilePage";
+import ChatsPage from "./components/ChatsPage";
 import Navbar from "./components/Navbar";
 import ChatBot from "./components/ChatBot";
 
@@ -35,6 +36,7 @@ const App = () => (
                   <Route path="/auth" element={<AuthPage />} />
                   <Route path="/checkout" element={<CheckoutPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/chats" element={<ChatsPage />} />
                 </Routes>
               </main>
               <ChatBot />

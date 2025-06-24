@@ -66,6 +66,56 @@ const ProductPage = () => {
     await addToCart(product.id, quantity);
   };
 
+  const handleContactSeller = async () => {
+    if (!product || !user) {
+      toast.error('Please sign in to contact seller');
+      return;
+    }
+
+    if (user.id === product.seller_id) {
+      toast.error("You can't contact yourself!");
+      return;
+    }
+
+    try {
+      // Check if conversation already exists
+      const { data: existingConv } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('buyer_id', user.id)
+        .eq('seller_id', product.seller_id)
+        .eq('product_id', product.id)
+        .single();
+
+      if (existingConv) {
+        // Redirect to existing conversation
+        window.location.href = '/chats';
+        return;
+      }
+
+      // Create new conversation
+      const { error } = await supabase
+        .from('conversations')
+        .insert({
+          buyer_id: user.id,
+          seller_id: product.seller_id,
+          product_id: product.id,
+        });
+
+      if (error) {
+        console.error('Error creating conversation:', error);
+        toast.error('Failed to start conversation');
+      } else {
+        toast.success('Conversation started! Check your chats.');
+        // Redirect to chats page
+        window.location.href = '/chats';
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Failed to contact seller');
+    }
+  };
+
   const handleNegotiation = async () => {
     if (!product || !user) {
       toast.error('Please sign in to negotiate');
@@ -79,25 +129,30 @@ const ProductPage = () => {
 
     setSubmittingNegotiation(true);
 
-    const { error } = await supabase
-      .from('negotiations')
-      .insert({
-        product_id: product.id,
-        buyer_id: user.id,
-        seller_id: product.seller_id,
-        original_price: product.price,
-        proposed_price: parseFloat(proposedPrice),
-        message: negotiationMessage,
-        status: 'pending',
-      });
+    try {
+      const { error } = await supabase
+        .from('negotiations')
+        .insert({
+          product_id: product.id,
+          buyer_id: user.id,
+          seller_id: product.seller_id,
+          original_price: product.price,
+          proposed_price: parseFloat(proposedPrice),
+          message: negotiationMessage,
+          status: 'pending',
+        });
 
-    if (error) {
-      console.error('Error submitting negotiation:', error);
+      if (error) {
+        console.error('Error submitting negotiation:', error);
+        toast.error('Failed to submit negotiation');
+      } else {
+        toast.success('Negotiation submitted! The seller will be notified.');
+        setShowNegotiation(false);
+        setNegotiationMessage('');
+      }
+    } catch (error) {
+      console.error('Error:', error);
       toast.error('Failed to submit negotiation');
-    } else {
-      toast.success('Negotiation submitted! The seller will be notified.');
-      setShowNegotiation(false);
-      setNegotiationMessage('');
     }
 
     setSubmittingNegotiation(false);
@@ -213,24 +268,36 @@ const ProductPage = () => {
                     </div>
                   </div>
 
-                  <div className="flex space-x-4">
+                  <div className="grid grid-cols-1 gap-3">
                     <Button
                       onClick={handleAddToCart}
-                      className="flex-1"
+                      className="w-full"
                       size="lg"
                     >
                       <ShoppingCart className="h-5 w-5 mr-2" />
                       Add to Cart
                     </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowNegotiation(!showNegotiation)}
-                      size="lg"
-                      disabled={!user}
-                    >
-                      <DollarSign className="h-5 w-5 mr-2" />
-                      Negotiate Price
-                    </Button>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={handleContactSeller}
+                        size="lg"
+                        disabled={!user}
+                      >
+                        <MessageSquare className="h-5 w-5 mr-2" />
+                        Contact Seller
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowNegotiation(!showNegotiation)}
+                        size="lg"
+                        disabled={!user}
+                      >
+                        <DollarSign className="h-5 w-5 mr-2" />
+                        Negotiate Price
+                      </Button>
+                    </div>
                   </div>
 
                   {!user && (
@@ -238,7 +305,7 @@ const ProductPage = () => {
                       <Link to="/auth" className="text-blue-600 hover:underline">
                         Sign in
                       </Link>{' '}
-                      to negotiate prices with sellers
+                      to contact seller and negotiate prices
                     </p>
                   )}
                 </div>
