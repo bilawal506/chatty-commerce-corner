@@ -100,26 +100,57 @@ const ProfilePage = () => {
     if (!user) return;
 
     setSaving(true);
-    const profileData = {
-      user_id: user.id,
-      full_name: fullName,
-      email: user.email,
-      phone: phone,
-      is_seller: isSeller,
-      address: address as Json,
-    };
+    
+    try {
+      // First, check if profile exists
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
 
-    const { error } = await supabase
-      .from('profiles')
-      .upsert(profileData);
+      const profileData = {
+        user_id: user.id,
+        full_name: fullName,
+        email: user.email,
+        phone: phone,
+        is_seller: isSeller,
+        address: address as Json,
+        updated_at: new Date().toISOString(),
+      };
 
-    if (error) {
-      console.error('Error saving profile:', error);
-      toast.error('Failed to save profile');
-    } else {
-      toast.success('Profile updated successfully!');
-      fetchProfile();
+      let error;
+
+      if (existingProfile) {
+        // Update existing profile
+        const result = await supabase
+          .from('profiles')
+          .update(profileData)
+          .eq('user_id', user.id);
+        error = result.error;
+      } else {
+        // Insert new profile
+        const result = await supabase
+          .from('profiles')
+          .insert({
+            ...profileData,
+            created_at: new Date().toISOString(),
+          });
+        error = result.error;
+      }
+
+      if (error) {
+        console.error('Error saving profile:', error);
+        toast.error('Failed to save profile');
+      } else {
+        toast.success('Profile updated successfully!');
+        fetchProfile();
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      toast.error('An unexpected error occurred');
     }
+    
     setSaving(false);
   };
 
