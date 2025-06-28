@@ -59,11 +59,15 @@ const NegotiationsTab = () => {
     // Fetch buyer profiles separately
     const negotiationsWithProfiles = await Promise.all(
       (data || []).map(async (negotiation) => {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('full_name')
           .eq('user_id', negotiation.buyer_id)
           .single();
+
+        if (profileError) {
+          console.error('Error fetching buyer profile:', profileError);
+        }
 
         return {
           ...negotiation,
@@ -94,30 +98,14 @@ const NegotiationsTab = () => {
       return;
     }
 
-    // If accepted, add item to buyer's cart
-    if (action === 'accept') {
-      const { error: cartError } = await supabase
-        .from('cart_items')
-        .upsert({
-          user_id: negotiation.buyer_id,
-          product_id: negotiation.product_id,
-          quantity: 1,
-        });
-
-      if (cartError) {
-        console.error('Error adding to cart:', cartError);
-        toast.error('Negotiation accepted but failed to add to buyer\'s cart');
-      }
-    }
-
     // Create notification for the buyer
     const notificationTitle = action === 'accept' 
       ? 'Negotiation Accepted!' 
       : 'Negotiation Rejected';
     
     const notificationMessage = action === 'accept'
-      ? `Your offer of $${negotiation.proposed_price} for ${negotiation.product.name} has been accepted and added to your cart!`
-      : `Your offer of $${negotiation.proposed_price} for ${negotiation.product.name} has been rejected.`;
+      ? `Great news! Your offer of $${negotiation.proposed_price} for ${negotiation.product.name} has been accepted! You can now add it to your cart at the negotiated price.`
+      : `Your offer of $${negotiation.proposed_price} for ${negotiation.product.name} has been rejected. You can try making a new offer.`;
 
     // Insert a conversation message as notification
     const { data: conversation } = await supabase
@@ -162,7 +150,7 @@ const NegotiationsTab = () => {
       }
     }
 
-    toast.success(`Negotiation ${action}ed successfully`);
+    toast.success(`Negotiation ${action}ed successfully! Buyer has been notified.`);
     fetchNegotiations();
   };
 
