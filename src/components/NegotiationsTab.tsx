@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +15,7 @@ interface Negotiation {
   message: string;
   created_at: string;
   buyer_id: string;
+  product_id: string;
   product: {
     name: string;
     image_url: string;
@@ -77,6 +77,9 @@ const NegotiationsTab = () => {
   };
 
   const handleNegotiationAction = async (negotiationId: string, action: 'accept' | 'reject') => {
+    const negotiation = negotiations.find(n => n.id === negotiationId);
+    if (!negotiation) return;
+
     const { error } = await supabase
       .from('negotiations')
       .update({ 
@@ -88,10 +91,79 @@ const NegotiationsTab = () => {
     if (error) {
       console.error('Error updating negotiation:', error);
       toast.error('Failed to update negotiation');
-    } else {
-      toast.success(`Negotiation ${action}ed successfully`);
-      fetchNegotiations();
+      return;
     }
+
+    // If accepted, add item to buyer's cart
+    if (action === 'accept') {
+      const { error: cartError } = await supabase
+        .from('cart_items')
+        .upsert({
+          user_id: negotiation.buyer_id,
+          product_id: negotiation.product_id,
+          quantity: 1,
+        });
+
+      if (cartError) {
+        console.error('Error adding to cart:', cartError);
+        toast.error('Negotiation accepted but failed to add to buyer\'s cart');
+      }
+    }
+
+    // Create notification for the buyer
+    const notificationTitle = action === 'accept' 
+      ? 'Negotiation Accepted!' 
+      : 'Negotiation Rejected';
+    
+    const notificationMessage = action === 'accept'
+      ? `Your offer of $${negotiation.proposed_price} for ${negotiation.product.name} has been accepted and added to your cart!`
+      : `Your offer of $${negotiation.proposed_price} for ${negotiation.product.name} has been rejected.`;
+
+    // Insert a conversation message as notification
+    const { data: conversation } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('buyer_id', negotiation.buyer_id)
+      .eq('product_id', negotiation.product_id)
+      .single();
+
+    if (conversation) {
+      await supabase
+        .from('conversation_messages')
+        .insert({
+          conversation_id: conversation.id,
+          sender_id: user!.id,
+          message: notificationMessage,
+          message_type: 'system',
+          is_read: false,
+        });
+    } else {
+      // Create a new conversation if none exists
+      const { data: newConversation } = await supabase
+        .from('conversations')
+        .insert({
+          buyer_id: negotiation.buyer_id,
+          seller_id: user!.id,
+          product_id: negotiation.product_id,
+        })
+        .select('id')
+        .single();
+
+      if (newConversation) {
+        await supabase
+          .from('conversation_messages')
+          .insert({
+            conversation_id: newConversation.id,
+            sender_id: user!.id,
+            message: notificationMessage,
+            message_type: 'system',
+            is_read: false,
+          });
+      }
+    }
+
+    toast.success(`Negotiation ${action}ed successfully`);
+    fetchNegotiations();
   };
 
   const getStatusBadge = (status: string) => {

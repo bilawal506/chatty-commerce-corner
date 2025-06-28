@@ -40,7 +40,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (!user) return;
 
     try {
-      // Fetch unread messages
+      // Fetch unread messages (including system messages for negotiations)
       const { data: messages } = await supabase
         .from('conversation_messages')
         .select(`
@@ -54,7 +54,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         .eq('is_read', false)
         .neq('sender_id', user.id);
 
-      // Fetch pending negotiations
+      // Fetch pending negotiations (only for sellers)
       const { data: negotiations } = await supabase
         .from('negotiations')
         .select(`
@@ -72,11 +72,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         const isSeller = msg.conversation.seller_id === user.id;
         
         if (isBuyer || isSeller) {
+          const isSystemMessage = msg.message_type === 'system';
+          const title = isSystemMessage ? 'Negotiation Update' : 'New Message';
+          
           notificationList.push({
             id: `msg-${msg.id}`,
-            type: 'message',
-            title: 'New Message',
-            message: `New message about ${msg.conversation.product?.name || 'a product'}`,
+            type: isSystemMessage ? 'negotiation' : 'message',
+            title,
+            message: isSystemMessage ? msg.message : `New message about ${msg.conversation.product?.name || 'a product'}`,
             isRead: msg.is_read,
             createdAt: msg.created_at,
             relatedId: msg.conversation_id,
@@ -84,7 +87,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
       });
 
-      // Process negotiations
+      // Process negotiations (for sellers)
       negotiations?.forEach((neg: any) => {
         notificationList.push({
           id: `neg-${neg.id}`,
