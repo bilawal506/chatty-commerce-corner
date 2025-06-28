@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { User, Settings, Package, MessageSquare, ShoppingBag } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
+import AddProductForm from '@/components/AddProductForm';
 import type { Json } from '@/integrations/supabase/types';
 
 interface AddressType {
@@ -228,7 +228,7 @@ const ProfilePage = () => {
           </div>
 
           {/* Profile Information */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Profile Information</CardTitle>
@@ -333,6 +333,11 @@ const ProfilePage = () => {
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Seller-only Add Product Section */}
+            {isSeller && (
+              <AddProductForm />
+            )}
           </div>
         </div>
       </div>
