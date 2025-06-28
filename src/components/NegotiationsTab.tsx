@@ -15,13 +15,14 @@ interface Negotiation {
   status: string;
   message: string;
   created_at: string;
+  buyer_id: string;
   product: {
     name: string;
     image_url: string;
   };
-  buyer_profile: {
+  buyer_profile?: {
     full_name: string;
-  };
+  } | null;
 }
 
 const NegotiationsTab = () => {
@@ -43,8 +44,7 @@ const NegotiationsTab = () => {
       .from('negotiations')
       .select(`
         *,
-        product:products(name, image_url),
-        buyer_profile:profiles!buyer_id(full_name)
+        product:products(name, image_url)
       `)
       .eq('seller_id', user.id)
       .order('created_at', { ascending: false });
@@ -52,9 +52,27 @@ const NegotiationsTab = () => {
     if (error) {
       console.error('Error fetching negotiations:', error);
       toast.error('Failed to load negotiations');
-    } else {
-      setNegotiations(data || []);
+      setLoading(false);
+      return;
     }
+
+    // Fetch buyer profiles separately
+    const negotiationsWithProfiles = await Promise.all(
+      (data || []).map(async (negotiation) => {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('user_id', negotiation.buyer_id)
+          .single();
+
+        return {
+          ...negotiation,
+          buyer_profile: profile,
+        };
+      })
+    );
+
+    setNegotiations(negotiationsWithProfiles);
     setLoading(false);
   };
 
