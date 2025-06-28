@@ -4,12 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { User, Settings, Package, MessageSquare, ShoppingBag } from 'lucide-react';
+import { User, Settings, Package, MessageSquare, ShoppingBag, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import AddProductForm from '@/components/AddProductForm';
+import NegotiationsTab from '@/components/NegotiationsTab';
 import type { Json } from '@/integrations/supabase/types';
 
 interface AddressType {
@@ -334,9 +336,28 @@ const ProfilePage = () => {
               </CardContent>
             </Card>
 
-            {/* Seller-only Add Product Section */}
+            {/* Seller-only Sections */}
             {isSeller && (
-              <AddProductForm />
+              <Tabs defaultValue="add-product" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="add-product" className="flex items-center space-x-2">
+                    <Package className="h-4 w-4" />
+                    <span>Add Product</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="negotiations" className="flex items-center space-x-2">
+                    <DollarSign className="h-4 w-4" />
+                    <span>Negotiations</span>
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="add-product">
+                  <AddProductForm />
+                </TabsContent>
+                
+                <TabsContent value="negotiations">
+                  <NegotiationsTab />
+                </TabsContent>
+              </Tabs>
             )}
           </div>
         </div>

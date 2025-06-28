@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
+import NotificationCenter from './NotificationCenter';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,6 +64,9 @@ const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-4">
+            {/* Notification Center */}
+            {user && <NotificationCenter />}
+
             <Link to="/cart" className="relative">
               <Button variant="ghost" size="sm" className="flex items-center space-x-2">
                 <ShoppingCart className="h-5 w-5" />
