@@ -18,12 +18,7 @@ interface Message {
   created_at: string;
   sender_name?: string;
   message_type?: string;
-  product_data?: {
-    id: string;
-    name: string;
-    price: number;
-    image_url: string;
-  };
+  product_data?: any;
 }
 
 interface Product {
@@ -149,19 +144,25 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (!user) return;
 
     setLoading(true);
+    
+    // Store product data as a JSON string in the message field
+    const productMessage = {
+      type: 'product_mention',
+      product: {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        image_url: product.image_url
+      }
+    };
+
     const { error } = await supabase
       .from('conversation_messages')
       .insert({
         conversation_id: conversationId,
         sender_id: user.id,
-        message: `Mentioned product: ${product.name}`,
-        message_type: 'product_mention',
-        product_data: {
-          id: product.id,
-          name: product.name,
-          price: product.price,
-          image_url: product.image_url
-        }
+        message: JSON.stringify(productMessage),
+        message_type: 'product_mention'
       });
 
     if (error) {
@@ -185,51 +186,63 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
+  const parseProductMessage = (message: string) => {
+    try {
+      return JSON.parse(message);
+    } catch {
+      return null;
+    }
+  };
+
   const renderMessage = (message: Message) => {
-    if (message.message_type === 'product_mention' && message.product_data) {
-      return (
-        <div
-          key={message.id}
-          className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
-        >
-          <Card className={`max-w-[70%] ${message.sender_id === user?.id ? 'bg-blue-50' : 'bg-gray-50'}`}>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <Package className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium">Product Mention</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <img
-                  src={message.product_data.image_url || '/placeholder-product.jpg'}
-                  alt={message.product_data.name}
-                  className="w-16 h-16 rounded object-cover"
-                />
-                <div className="flex-1">
-                  <h4 className="font-medium text-gray-900">{message.product_data.name}</h4>
-                  <p className="text-lg font-bold text-blue-600">${message.product_data.price}</p>
-                  <Button
-                    onClick={() => handleProductClick(message.product_data!.id)}
-                    size="sm"
-                    className="mt-2"
-                  >
-                    <ExternalLink className="h-3 w-3 mr-1" />
-                    View Product
-                  </Button>
+    if (message.message_type === 'product_mention') {
+      const productData = parseProductMessage(message.message);
+      
+      if (productData && productData.type === 'product_mention' && productData.product) {
+        return (
+          <div
+            key={message.id}
+            className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'} mb-4`}
+          >
+            <Card className={`max-w-[70%] ${message.sender_id === user?.id ? 'bg-blue-50' : 'bg-gray-50'}`}>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2 mb-3">
+                  <Package className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-medium">Product Mention</span>
                 </div>
-              </div>
-              <p className="text-xs text-gray-500 mt-2">
-                {new Date(message.created_at).toLocaleTimeString()}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      );
+                <div className="flex items-center space-x-3">
+                  <img
+                    src={productData.product.image_url || '/placeholder-product.jpg'}
+                    alt={productData.product.name}
+                    className="w-16 h-16 rounded object-cover"
+                  />
+                  <div className="flex-1">
+                    <h4 className="font-medium text-gray-900">{productData.product.name}</h4>
+                    <p className="text-lg font-bold text-blue-600">${productData.product.price}</p>
+                    <Button
+                      onClick={() => handleProductClick(productData.product.id)}
+                      size="sm"
+                      className="mt-2"
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      View Product
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {new Date(message.created_at).toLocaleTimeString()}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      }
     }
 
     return (
       <div
         key={message.id}
-        className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
+        className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'} mb-4`}
       >
         <div
           className={`max-w-[70%] p-3 rounded-lg ${
@@ -309,7 +322,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4">
           {messages.length === 0 ? (
             <div className="text-center text-gray-500 py-8">
               <p>No messages yet. Start the conversation!</p>
