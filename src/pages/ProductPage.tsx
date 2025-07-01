@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,6 +24,7 @@ interface Product {
 
 const ProductPage = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
@@ -35,11 +35,22 @@ const ProductPage = () => {
   const { addToCart } = useCart();
   const { user } = useAuth();
 
+  // Check for negotiated price in URL params
+  const negotiatedPrice = searchParams.get('negotiated_price');
+  const negotiationId = searchParams.get('negotiation_id');
+
   useEffect(() => {
     if (id) {
       fetchProduct();
     }
   }, [id]);
+
+  useEffect(() => {
+    // If there's a negotiated price in the URL, show special add to cart option
+    if (negotiatedPrice && negotiationId) {
+      toast.success(`Your negotiation was accepted! You can now add this item to cart at $${negotiatedPrice}`);
+    }
+  }, [negotiatedPrice, negotiationId]);
 
   const fetchProduct = async () => {
     if (!id) return;
@@ -64,7 +75,28 @@ const ProductPage = () => {
 
   const handleAddToCart = async () => {
     if (!product) return;
-    await addToCart(product.id, quantity);
+    
+    // If this is from a negotiation, use the negotiated price
+    if (negotiatedPrice && negotiationId) {
+      // First update the product price temporarily for this add to cart
+      const originalPrice = product.price;
+      product.price = parseFloat(negotiatedPrice);
+      
+      await addToCart(product.id, quantity);
+      
+      // Mark the negotiation as fulfilled
+      await supabase
+        .from('negotiations')
+        .update({ status: 'fulfilled' })
+        .eq('id', negotiationId);
+      
+      // Restore original price
+      product.price = originalPrice;
+      
+      toast.success(`Item added to cart at negotiated price of $${negotiatedPrice}!`);
+    } else {
+      await addToCart(product.id, quantity);
+    }
   };
 
   const handleContactSeller = async () => {
@@ -86,13 +118,13 @@ const ProductPage = () => {
     try {
       console.log('Creating conversation with seller_id:', product.seller_id);
       
-      // Check if conversation already exists
+      // Check if conversation already exists (without product_id constraint for direct seller contact)
       const { data: existingConv } = await supabase
         .from('conversations')
         .select('id')
         .eq('buyer_id', user.id)
         .eq('seller_id', product.seller_id)
-        .eq('product_id', product.id)
+        .is('product_id', null)
         .single();
 
       if (existingConv) {
@@ -101,13 +133,13 @@ const ProductPage = () => {
         return;
       }
 
-      // Create new conversation
+      // Create new direct conversation (without product_id)
       const { error } = await supabase
         .from('conversations')
         .insert({
           buyer_id: user.id,
           seller_id: product.seller_id,
-          product_id: product.id,
+          product_id: null, // Direct seller contact, not product-specific
         });
 
       if (error) {
@@ -248,7 +280,10 @@ const ProductPage = () => {
             <div className="border-t pt-6">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-3xl font-bold text-gray-900">
-                  ${product.price}
+                  {negotiatedPrice ? `$${negotiatedPrice}` : `$${product.price}`}
+                  {negotiatedPrice && (
+                    <span className="text-sm text-green-600 ml-2">(Negotiated Price!)</span>
+                  )}
                 </span>
                 {product.stock_quantity <= 5 && product.stock_quantity > 0 && (
                   <span className="text-orange-600 font-medium">
@@ -290,7 +325,7 @@ const ProductPage = () => {
                       size="lg"
                     >
                       <ShoppingCart className="h-5 w-5 mr-2" />
-                      Add to Cart
+                      {negotiatedPrice ? `Add to Cart ($${negotiatedPrice})` : 'Add to Cart'}
                     </Button>
                     
                     <div className="grid grid-cols-2 gap-3">
@@ -303,15 +338,17 @@ const ProductPage = () => {
                         <MessageSquare className="h-5 w-5 mr-2" />
                         Contact Seller
                       </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowNegotiation(!showNegotiation)}
-                        size="lg"
-                        disabled={!user || !product.seller_id}
-                      >
-                        <DollarSign className="h-5 w-5 mr-2" />
-                        Negotiate Price
-                      </Button>
+                      {!negotiatedPrice && (
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowNegotiation(!showNegotiation)}
+                          size="lg"
+                          disabled={!user || !product.seller_id}
+                        >
+                          <DollarSign className="h-5 w-5 mr-2" />
+                          Negotiate Price
+                        </Button>
+                      )}
                     </div>
                   </div>
 

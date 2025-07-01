@@ -98,70 +98,15 @@ const NegotiationsTab = () => {
       return;
     }
 
-    // If accepted, add item to buyer's cart with negotiated price
-    if (action === 'accept') {
-      // Check if item already exists in cart
-      const { data: existingCartItem } = await supabase
-        .from('cart_items')
-        .select('*')
-        .eq('user_id', negotiation.buyer_id)
-        .eq('product_id', negotiation.product_id)
-        .single();
-
-      if (existingCartItem) {
-        // Update existing cart item quantity
-        const { error: cartError } = await supabase
-          .from('cart_items')
-          .update({ 
-            quantity: existingCartItem.quantity + 1,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingCartItem.id);
-
-        if (cartError) {
-          console.error('Error updating cart:', cartError);
-          toast.error('Negotiation accepted but failed to update cart');
-          return;
-        }
-      } else {
-        // Add new item to cart
-        const { error: cartError } = await supabase
-          .from('cart_items')
-          .insert({
-            user_id: negotiation.buyer_id,
-            product_id: negotiation.product_id,
-            quantity: 1,
-          });
-
-        if (cartError) {
-          console.error('Error adding to cart:', cartError);
-          toast.error('Negotiation accepted but failed to add to cart');
-          return;
-        }
-      }
-
-      // Update product price to negotiated price
-      const { error: priceError } = await supabase
-        .from('products')
-        .update({ 
-          price: negotiation.proposed_price,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', negotiation.product_id);
-
-      if (priceError) {
-        console.error('Error updating product price:', priceError);
-        // Don't show error to user as the main action succeeded
-      }
-    }
-
     // Create notification for the buyer
     const notificationTitle = action === 'accept' 
       ? 'Negotiation Accepted!' 
       : 'Negotiation Rejected';
     
+    const negotiationLink = `${window.location.origin}/product/${negotiation.product_id}?negotiated_price=${negotiation.proposed_price}&negotiation_id=${negotiation.id}`;
+    
     const notificationMessage = action === 'accept'
-      ? `Great news! Your offer of $${negotiation.proposed_price} for ${negotiation.product.name} has been accepted and added to your cart at the negotiated price!`
+      ? `Great news! Your offer of $${negotiation.proposed_price} for ${negotiation.product.name} has been accepted! Click this link to add it to your cart at the negotiated price: ${negotiationLink}`
       : `Your offer of $${negotiation.proposed_price} for ${negotiation.product.name} has been rejected. You can try making a new offer.`;
 
     // Insert a conversation message as notification
@@ -208,7 +153,7 @@ const NegotiationsTab = () => {
     }
 
     const successMessage = action === 'accept' 
-      ? `Negotiation accepted successfully! Item added to buyer's cart at $${negotiation.proposed_price}.`
+      ? `Negotiation accepted successfully! Buyer has been sent a link to add the item to cart at $${negotiation.proposed_price}.`
       : 'Negotiation rejected successfully! Buyer has been notified.';
     
     toast.success(successMessage);
