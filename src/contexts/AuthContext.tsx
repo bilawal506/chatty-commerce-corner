@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,8 +7,8 @@ import { ensureUserProfile } from '@/utils/profileUtils';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, fullName?: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, fullName?: string, isSeller?: boolean) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -45,16 +46,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      setLoading(false);
+      return { error };
     } catch (error: any) {
       console.error('Error signing in:', error.message);
-      throw error;
-    } finally {
       setLoading(false);
+      return { error };
     }
   };
 
-  const signUp = async (email: string, password: string, fullName?: string) => {
+  const signUp = async (email: string, password: string, fullName?: string, isSeller?: boolean) => {
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -63,22 +64,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         options: {
           data: {
             full_name: fullName,
+            is_seller: isSeller
           },
         },
       });
 
       if (error) {
-        throw error;
+        setLoading(false);
+        return { error };
       }
 
       if (data.user) {
         await ensureUserProfile(data.user.id, data.user.email);
       }
+      
+      setLoading(false);
+      return { error: null };
     } catch (error: any) {
       console.error('Error signing up:', error.message);
-      throw error;
-    } finally {
       setLoading(false);
+      return { error };
     }
   };
 
