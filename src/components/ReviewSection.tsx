@@ -15,9 +15,7 @@ interface Review {
   rating: number;
   comment: string | null;
   created_at: string;
-  profiles: {
-    full_name: string | null;
-  } | null;
+  user_name?: string;
 }
 
 interface ReviewSectionProps {
@@ -40,30 +38,54 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ productId, sellerId }) =>
 
   const fetchReviews = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    
+    // Fetch reviews and user names separately due to relationship issues
+    const { data: reviewsData, error: reviewsError } = await supabase
       .from('reviews')
-      .select(`
-        *,
-        profiles!reviews_user_id_fkey (
-          full_name
-        )
-      `)
+      .select('*')
       .eq('product_id', productId)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching reviews:', error);
+    if (reviewsError) {
+      console.error('Error fetching reviews:', reviewsError);
       toast.error('Failed to load reviews');
-    } else {
-      setReviews(data || []);
-      // Find current user's review
-      const currentUserReview = data?.find(review => review.user_id === user?.id);
-      if (currentUserReview) {
-        setUserReview(currentUserReview);
-        setRating(currentUserReview.rating);
-        setComment(currentUserReview.comment || '');
-      }
+      setLoading(false);
+      return;
     }
+
+    // Fetch user names for the reviews
+    const reviewsWithNames: Review[] = [];
+    
+    for (const review of reviewsData || []) {
+      let userName = 'Anonymous User';
+      
+      // Try to get the user's full name from profiles
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('user_id', review.user_id)
+        .single();
+      
+      if (profileData?.full_name) {
+        userName = profileData.full_name;
+      }
+      
+      reviewsWithNames.push({
+        ...review,
+        user_name: userName
+      });
+    }
+
+    setReviews(reviewsWithNames);
+    
+    // Find current user's review
+    const currentUserReview = reviewsWithNames.find(review => review.user_id === user?.id);
+    if (currentUserReview) {
+      setUserReview(currentUserReview);
+      setRating(currentUserReview.rating);
+      setComment(currentUserReview.comment || '');
+    }
+    
     setLoading(false);
   };
 
@@ -273,14 +295,14 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ productId, sellerId }) =>
                 <div className="flex items-start space-x-3">
                   <Avatar>
                     <AvatarFallback>
-                      {review.profiles?.full_name?.charAt(0).toUpperCase() || 'U'}
+                      {review.user_name?.charAt(0).toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <p className="font-medium">
-                          {review.profiles?.full_name || 'Anonymous User'}
+                          {review.user_name || 'Anonymous User'}
                         </p>
                         <StarRating rating={review.rating} />
                       </div>

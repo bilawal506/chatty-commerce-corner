@@ -10,6 +10,7 @@ import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShoppingCart, Star, MessageSquare, DollarSign, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
+import ReviewSection from '@/components/ReviewSection';
 
 interface Product {
   id: string;

@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import AddProductForm from '@/components/AddProductForm';
 import NegotiationsTab from '@/components/NegotiationsTab';
+import SellerProductsTab from '@/components/SellerProductsTab';
 import type { Json } from '@/integrations/supabase/types';
 
 interface AddressType {
