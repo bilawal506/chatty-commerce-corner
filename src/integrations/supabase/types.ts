@@ -101,6 +101,7 @@ export type Database = {
           message: string
           message_type: string | null
           sender_id: string
+          sender_name: string | null
         }
         Insert: {
           conversation_id: string
@@ -110,6 +111,7 @@ export type Database = {
           message: string
           message_type?: string | null
           sender_id: string
+          sender_name?: string | null
         }
         Update: {
           conversation_id?: string
@@ -119,6 +121,7 @@ export type Database = {
           message?: string
           message_type?: string | null
           sender_id?: string
+          sender_name?: string | null
         }
         Relationships: [
           {
@@ -133,27 +136,33 @@ export type Database = {
       conversations: {
         Row: {
           buyer_id: string
+          buyer_name: string | null
           created_at: string
           id: string
           last_message_at: string | null
           product_id: string | null
           seller_id: string
+          seller_name: string | null
         }
         Insert: {
           buyer_id: string
+          buyer_name?: string | null
           created_at?: string
           id?: string
           last_message_at?: string | null
           product_id?: string | null
           seller_id: string
+          seller_name?: string | null
         }
         Update: {
           buyer_id?: string
+          buyer_name?: string | null
           created_at?: string
           id?: string
           last_message_at?: string | null
           product_id?: string | null
           seller_id?: string
+          seller_name?: string | null
         }
         Relationships: [
           {
@@ -357,6 +366,36 @@ export type Database = {
           id?: string
           is_seller?: boolean | null
           phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      reviews: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          product_id: string
+          rating: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          product_id: string
+          rating: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          product_id?: string
+          rating?: number
           updated_at?: string
           user_id?: string
         }

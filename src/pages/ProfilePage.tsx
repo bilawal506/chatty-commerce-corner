@@ -339,10 +339,14 @@ const ProfilePage = () => {
             {/* Seller-only Sections */}
             {isSeller && (
               <Tabs defaultValue="add-product" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="add-product" className="flex items-center space-x-2">
                     <Package className="h-4 w-4" />
                     <span>Add Product</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="my-products" className="flex items-center space-x-2">
+                    <Package className="h-4 w-4" />
+                    <span>My Products</span>
                   </TabsTrigger>
                   <TabsTrigger value="negotiations" className="flex items-center space-x-2">
                     <DollarSign className="h-4 w-4" />
@@ -352,6 +356,10 @@ const ProfilePage = () => {
                 
                 <TabsContent value="add-product">
                   <AddProductForm />
+                </TabsContent>
+                
+                <TabsContent value="my-products">
+                  <SellerProductsTab />
                 </TabsContent>
                 
                 <TabsContent value="negotiations">

@@ -121,13 +121,24 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (!newMessage.trim() || !user) return;
 
     setLoading(true);
+    
+    // Get user's full name for the message
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('user_id', user.id)
+      .single();
+
+    const senderName = profile?.full_name || 'User';
+
     const { error } = await supabase
       .from('conversation_messages')
       .insert({
         conversation_id: conversationId,
         sender_id: user.id,
         message: newMessage.trim(),
-        message_type: 'text'
+        message_type: 'text',
+        sender_name: senderName
       });
 
     if (error) {
@@ -144,6 +155,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (!user) return;
 
     setLoading(true);
+    
+    // Get user's full name for the message
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('user_id', user.id)
+      .single();
+
+    const senderName = profile?.full_name || 'User';
     
     // Store product data as a JSON string in the message field
     const productMessage = {
@@ -162,7 +182,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         conversation_id: conversationId,
         sender_id: user.id,
         message: JSON.stringify(productMessage),
-        message_type: 'product_mention'
+        message_type: 'product_mention',
+        sender_name: senderName
       });
 
     if (error) {
@@ -209,6 +230,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 <div className="flex items-center space-x-2 mb-3">
                   <Package className="h-4 w-4 text-blue-600" />
                   <span className="text-sm font-medium">Product Mention</span>
+                  <span className="text-xs text-gray-500">
+                    by {message.sender_name || 'User'}
+                  </span>
                 </div>
                 <div className="flex items-center space-x-3">
                   <img
@@ -252,9 +276,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           }`}
         >
           <div className="text-sm">{message.message}</div>
-          <p className="text-xs opacity-70 mt-1">
-            {new Date(message.created_at).toLocaleTimeString()}
-          </p>
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-xs opacity-70">
+              {message.sender_name || 'User'}
+            </p>
+            <p className="text-xs opacity-70">
+              {new Date(message.created_at).toLocaleTimeString()}
+            </p>
+          </div>
         </div>
       </div>
     );

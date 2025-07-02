@@ -32,6 +32,7 @@ const ProductPage = () => {
   const [proposedPrice, setProposedPrice] = useState('');
   const [negotiationMessage, setNegotiationMessage] = useState('');
   const [submittingNegotiation, setSubmittingNegotiation] = useState(false);
+  const [sellerName, setSellerName] = useState<string>('');
   const { addToCart } = useCart();
   const { user } = useAuth();
 
@@ -69,6 +70,17 @@ const ProductPage = () => {
       console.log('Fetched product:', data);
       setProduct(data);
       setProposedPrice(data.price.toString());
+      
+      // Fetch seller information
+      if (data.seller_id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('user_id', data.seller_id)
+          .single();
+        
+        setSellerName(profile?.full_name || 'Unknown Seller');
+      }
     }
     setLoading(false);
   };
@@ -253,7 +265,7 @@ const ProductPage = () => {
           </Link>
         </Button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Product Image */}
           <div className="aspect-square overflow-hidden rounded-lg bg-white shadow-sm">
             <img
@@ -268,9 +280,8 @@ const ProductPage = () => {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <Badge variant="secondary">{product.category}</Badge>
-                <div className="flex items-center space-x-1">
-                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                  <span className="text-sm text-gray-600">4.5 (127 reviews)</span>
+                <div className="text-sm text-gray-600">
+                  Sold by: <span className="font-medium">{sellerName}</span>
                 </div>
               </div>
               <h1 className="text-3xl font-bold text-gray-900 mb-4">{product.name}</h1>
@@ -439,6 +450,11 @@ const ProductPage = () => {
             </Card>
           </div>
         </div>
+
+        {/* Reviews Section */}
+        {product.seller_id && (
+          <ReviewSection productId={product.id} sellerId={product.seller_id} />
+        )}
       </div>
     </div>
   );

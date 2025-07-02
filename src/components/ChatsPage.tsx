@@ -76,7 +76,7 @@ const ChatsPage = () => {
       console.error('Error fetching conversations:', error);
       toast.error('Failed to load conversations');
     } else {
-      // Fetch other user details for each conversation
+      // Enhanced user fetching with profile information
       const conversationsWithUsers = await Promise.all(
         (data || []).map(async (conv) => {
           const otherUserId = conv.buyer_id === user.id ? conv.seller_id : conv.buyer_id;
@@ -87,11 +87,21 @@ const ChatsPage = () => {
             .eq('user_id', otherUserId)
             .single();
 
+          // Fallback to stored names in conversation if profile doesn't exist
+          let userName = 'Unknown User';
+          if (profile?.full_name) {
+            userName = profile.full_name;
+          } else if (conv.buyer_id === user.id && conv.seller_name) {
+            userName = conv.seller_name;
+          } else if (conv.seller_id === user.id && conv.buyer_name) {
+            userName = conv.buyer_name;
+          }
+
           return {
             ...conv,
             other_user: {
               id: otherUserId,
-              full_name: profile?.full_name || 'Unknown User',
+              full_name: userName,
               email: profile?.email || ''
             },
             unread_count: 0 // TODO: Implement unread count
