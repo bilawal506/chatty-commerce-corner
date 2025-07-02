@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -37,7 +38,6 @@ const ChatsPage = () => {
       ensureUserProfile(user.id, user.email);
       fetchConversations();
       
-      // Set up real-time subscription for new conversations
       const channel = supabase
         .channel('conversations')
         .on(
@@ -76,7 +76,6 @@ const ChatsPage = () => {
       console.error('Error fetching conversations:', error);
       toast.error('Failed to load conversations');
     } else {
-      // Enhanced user fetching with profile information
       const conversationsWithUsers = await Promise.all(
         (data || []).map(async (conv) => {
           const otherUserId = conv.buyer_id === user.id ? conv.seller_id : conv.buyer_id;
@@ -89,7 +88,7 @@ const ChatsPage = () => {
               full_name: userName,
               email: ''
             },
-            unread_count: 0 // TODO: Implement unread count
+            unread_count: 0
           };
         })
       );

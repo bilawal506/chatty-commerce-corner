@@ -112,7 +112,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const fetchSellerProducts = async () => {
-    // Fetch products belonging to the other user (seller)
     const { data, error } = await supabase
       .from('products')
       .select('id, name, price, image_url')
@@ -157,17 +156,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (!user) return;
 
     setLoading(true);
+    const senderName = await getUserDisplayName(user.id);
     
-    // Get user's full name for the message
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('user_id', user.id)
-      .single();
-
-    const senderName = profile?.full_name || 'User';
-    
-    // Store product data as a JSON string in the message field
     const productMessage = {
       type: 'product_mention',
       product: {

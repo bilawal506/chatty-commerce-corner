@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +7,7 @@ import { Star, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { getUserDisplayName } from '@/utils/profileUtils';
 
 interface Review {
   id: string;
@@ -55,23 +55,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ productId, sellerId }) =>
     const reviewsWithNames: Review[] = [];
     
     for (const review of reviewsData || []) {
-      let userName = 'Anonymous User';
-      
-      // Try to get the user's full name from profiles
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('full_name, email')
-        .eq('user_id', review.user_id)
-        .single();
-      
-      if (profileData?.full_name) {
-        userName = profileData.full_name;
-      } else if (profileData?.email) {
-        userName = profileData.email.split('@')[0];
-      } else {
-        // Create a user-friendly name from user ID
-        userName = `User ${review.user_id.slice(0, 8)}`;
-      }
+      const userName = await getUserDisplayName(review.user_id);
       
       reviewsWithNames.push({
         ...review,
