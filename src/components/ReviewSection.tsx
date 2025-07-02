@@ -39,7 +39,6 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ productId, sellerId }) =>
   const fetchReviews = async () => {
     setLoading(true);
     
-    // Fetch reviews and user names separately due to relationship issues
     const { data: reviewsData, error: reviewsError } = await supabase
       .from('reviews')
       .select('*')
@@ -53,7 +52,6 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ productId, sellerId }) =>
       return;
     }
 
-    // Fetch user names for the reviews
     const reviewsWithNames: Review[] = [];
     
     for (const review of reviewsData || []) {
@@ -62,12 +60,17 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ productId, sellerId }) =>
       // Try to get the user's full name from profiles
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('full_name')
+        .select('full_name, email')
         .eq('user_id', review.user_id)
         .single();
       
       if (profileData?.full_name) {
         userName = profileData.full_name;
+      } else if (profileData?.email) {
+        userName = profileData.email.split('@')[0];
+      } else {
+        // Create a user-friendly name from user ID
+        userName = `User ${review.user_id.slice(0, 8)}`;
       }
       
       reviewsWithNames.push({
@@ -78,7 +81,6 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ productId, sellerId }) =>
 
     setReviews(reviewsWithNames);
     
-    // Find current user's review
     const currentUserReview = reviewsWithNames.find(review => review.user_id === user?.id);
     if (currentUserReview) {
       setUserReview(currentUserReview);

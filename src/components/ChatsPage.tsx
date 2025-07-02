@@ -1,14 +1,13 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { MessageCircle, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import ChatInterface from './ChatInterface';
 import { toast } from 'sonner';
+import { ensureUserProfile, getUserDisplayName } from '@/utils/profileUtils';
 
 interface Conversation {
   id: string;
@@ -35,6 +34,7 @@ const ChatsPage = () => {
 
   useEffect(() => {
     if (user) {
+      ensureUserProfile(user.id, user.email);
       fetchConversations();
       
       // Set up real-time subscription for new conversations
@@ -80,29 +80,14 @@ const ChatsPage = () => {
       const conversationsWithUsers = await Promise.all(
         (data || []).map(async (conv) => {
           const otherUserId = conv.buyer_id === user.id ? conv.seller_id : conv.buyer_id;
+          const userName = await getUserDisplayName(otherUserId);
           
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('full_name, email')
-            .eq('user_id', otherUserId)
-            .single();
-
-          // Fallback to stored names in conversation if profile doesn't exist
-          let userName = 'Unknown User';
-          if (profile?.full_name) {
-            userName = profile.full_name;
-          } else if (conv.buyer_id === user.id && conv.seller_name) {
-            userName = conv.seller_name;
-          } else if (conv.seller_id === user.id && conv.buyer_name) {
-            userName = conv.buyer_name;
-          }
-
           return {
             ...conv,
             other_user: {
               id: otherUserId,
               full_name: userName,
-              email: profile?.email || ''
+              email: ''
             },
             unread_count: 0 // TODO: Implement unread count
           };

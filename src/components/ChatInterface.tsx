@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { ensureUserProfile, getUserDisplayName } from '@/utils/profileUtils';
 
 interface Message {
   id: string;
@@ -57,14 +57,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   useEffect(() => {
+    if (user) {
+      ensureUserProfile(user.id, user.email);
+    }
     scrollToBottom();
-  }, [messages]);
+  }, [messages, user]);
 
   useEffect(() => {
     fetchMessages();
     fetchSellerProducts();
     
-    // Set up real-time subscription
     const channel = supabase
       .channel('conversation-messages')
       .on(
@@ -75,8 +77,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           table: 'conversation_messages',
           filter: `conversation_id=eq.${conversationId}`
         },
-        (payload) => {
+        async (payload) => {
           const newMsg = payload.new as Message;
+          newMsg.sender_name = await getUserDisplayName(newMsg.sender_id);
           setMessages(prev => [...prev, newMsg]);
         }
       )
@@ -98,7 +101,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       console.error('Error fetching messages:', error);
       toast.error('Failed to load messages');
     } else {
-      setMessages(data || []);
+      const messagesWithNames = await Promise.all(
+        (data || []).map(async (msg) => ({
+          ...msg,
+          sender_name: await getUserDisplayName(msg.sender_id)
+        }))
+      );
+      setMessages(messagesWithNames);
     }
   };
 
@@ -121,33 +130,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (!newMessage.trim() || !user) return;
 
     setLoading(true);
-    
-    // Get user's full name for the message
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('user_id', user.id)
-      .single();
+    const senderName = await getUserDisplayName(user.id);
 
-    const senderName = profile?.full_name || 'User';
+    try {
+      const { error } = await supabase
+        .from('conversation_messages')
+        .insert({
+          conversation_id: conversationId,
+          sender_id: user.id,
+          message: newMessage.trim(),
+          sender_name: senderName
+        });
 
-    const { error } = await supabase
-      .from('conversation_messages')
-      .insert({
-        conversation_id: conversationId,
-        sender_id: user.id,
-        message: newMessage.trim(),
-        message_type: 'text',
-        sender_name: senderName
-      });
+      if (error) throw error;
 
-    if (error) {
+      setNewMessage('');
+    } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send message');
-    } else {
-      setNewMessage('');
-      setShowProductMentions(false);
     }
+
     setLoading(false);
   };
 
